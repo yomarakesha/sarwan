@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Hereketler - Suw CRM{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Ulanyjy hereketleri</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sene</th>
+                        <th>Ulanyjy</th>
+                        <th>Hereket</th>
+                        <th>Obýekt</th>
+                        <th>ID</th>
+                        <th>Maglumatlar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs.items %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ log.user.username }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if log.action == 'CREATE' %}badge-paid
+                                {% elif log.action == 'UPDATE' %}badge-legal
+                                {% elif log.action == 'DELETE' %}badge-debt
+                                {% else %}badge-individual{% endif %}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td>{{ log.entity or '-' }}</td>
+                        <td>{{ log.entity_id or '-' }}</td>
+                        <td><small>{{ log.details or '-' }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Hereket tapylmady</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if logs.pages > 1 %}
+        <div class="mt-2" style="display: flex; gap: 8px; justify-content: center;">
+            {% if logs.has_prev %}
+            <a href="?page={{ logs.prev_num }}" class="btn btn-sm">← Öňki</a>
+            {% endif %}
+            <span class="btn btn-sm" style="background: var(--primary); color: #fff;">{{ logs.page }} / {{ logs.pages
+                }}</span>
+            {% if logs.has_next %}
+            <a href="?page={{ logs.next_num }}" class="btn btn-sm">Soňky →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

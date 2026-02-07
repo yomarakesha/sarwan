@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Sargytlar - Sarwan{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Sargytlar</h3>
+        <button class="btn btn-primary" onclick="openModal('create-order-modal')">+ Täze sargyt</button>
+    </div>
+    <div class="card-body">
+        <!-- Search/Filter -->
+        <form class="filters" method="GET">
+            <input type="text" name="search" class="form-control" placeholder="Gözleg..." value="{{ search }}">
+            <select name="type" class="form-control">
+                <option value="all" {% if search_type=='all' %}selected{% endif %}>Hemmesi</option>
+                <option value="id" {% if search_type=='id' %}selected{% endif %}>ID boýunça</option>
+                <option value="address" {% if search_type=='address' %}selected{% endif %}>Salgy boýunça</option>
+            </select>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}"
+                placeholder="Başlangyç sene">
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}" placeholder="Ahyrky sene">
+            <button type="submit" class="btn btn-primary">Gözle</button>
+            <a href="{{ url_for('orders.index') }}" class="btn">Arassala</a>
+        </form>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Salgy</th>
+                        <th>Täze çüýşe</th>
+                        <th>Täze satyn alan we beýleki gap</th>
+                        <th>Salwan ýerini çalyşmak</th>
+                        <th>Goýup bermek</th>
+                        <th>Jemi</th>
+                        <th>Sene</th>
+                        <th>Amallar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td>{{ o.id }}</td>
+                        <td>{{ o.subscriber.address or '-' }}</td>
+                        <td>{{ o.new_bottles }}</td>
+                        <td>{{ o.exchange_bottles }}</td>
+                        <td>{{ o.water_only }}</td>
+                        <td>{{ o.free_bottles }}</td>
+                        <td>
+                            {% if o.is_free %}
+                            <span class="badge badge-paid" style="background: #4CAF50;">Mugt</span>
+                            {% else %}
+                            <strong>{{ o.total_amount|round(2) }} TMT</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ o.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('orders.delete', id=o.id) }}" style="display:inline;"
+                                onsubmit="return confirmDelete(this)">
+                                <button type="submit" class="btn btn-sm btn-danger">Öçür</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center">Sargyt tapylmady</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create Order Modal -->
+<div class="modal-overlay" id="create-order-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h4>Täze sargyt</h4>
+            <button class="modal-close" onclick="closeModal('create-order-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('orders.create') }}" onsubmit="return validateOrderForm()">
+            <input type="hidden" id="subscriber-valid" value="false">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Müşderi ID</label>
+                    <input type="number" name="subscriber_id" id="subscriber-id-input" class="form-control"
+                        placeholder="Müşderiniň ID-sini giriziň" required oninput="loadSubscriberInfo(this.value)">
+                    <div id="subscriber-info"
+                        style="margin-top: 10px; padding: 10px; background: #e8f4e8; border-radius: 5px; display: none; color: #333; border: 1px solid #ccc;">
+                        <p><strong>Salgy:</strong> <span id="subscriber-address">-</span></p>
+                        <p><strong>Telefon:</strong> <span id="subscriber-phone">-</span></p>
+                        <p><strong>Görnüşi:</strong> <span id="selected-client-type">-</span></p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Täze çüýşe (sany)</label>
+                    <input type="number" name="new_bottles" class="form-control" value="0" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Täze satyn alan we beýleki gap (sany)</label>
+                    <input type="number" name="exchange_bottles" class="form-control" value="0" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Salwan ýerini çalyşmak (sany)</label>
+                    <input type="number" name="water_only" class="form-control" value="0" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Goýup bermek (sany)</label>
+                    <input type="number" name="free_bottles" class="form-control" value="0" min="0">
+                </div>
+
+                <div class="form-group" id="payment-group">
+                    <label>Tölenen mukdar (TMT)</label>
+                    <input type="number" name="paid_amount" id="paid_amount" class="form-control" step="0.01" min="0"
+                        placeholder="Boş bolsa, doly töleg hasaplanýar">
+                </div>
+
+                <hr style="border-color: #444; margin: 15px 0;">
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="mugt_checkbox" name="is_free" onchange="toggleFreeOrder(this)">
+                    <label for="mugt_checkbox" style="margin: 0; cursor: pointer;">Mugt sargyt</label>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                    <input type="checkbox" id="kredit_checkbox" onchange="toggleCreditSection(this)">
+                    <label for="kredit_checkbox" style="margin: 0; cursor: pointer; color: #e74c3c;">Kredit hasap
+                        (105/15)</label>
+                </div>
+
+                <div id="credit-section"
+                    style="display: none; background: #fff3f3; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #ffcdd2;">
+                    <div class="form-group">
+                        <label>Gap bilen (sany) × 105 TMT</label>
+                        <input type="number" name="gap_bilen" id="gap_bilen" class="form-control" value="0" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Diňe suw (sany) × 15 TMT</label>
+                        <input type="number" name="dine_suw" id="dine_suw" class="form-control" value="0" min="0">
+                    </div>
+                    <small class="text-muted">Deslapky hasaplanan bahalar ulanylar</small>
+                </div>
+
+                <hr style="border-color: #444; margin: 15px 0;">
+
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('create-order-modal')">Ýatyr</button>
+                <button type="submit" class="btn btn-primary">Döret</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var subscriberValid = false;
+    var previousPaidAmount = '';
+
+    function loadSubscriberInfo(subscriberId) {
+        var infoDiv = document.getElementById('subscriber-info');
+        subscriberValid = false;
+        document.getElementById('subscriber-valid').value = 'false';
+
+        if (!subscriberId) {
+            infoDiv.style.display = 'none';
+            return;
+        }
+
+        fetch('/subscribers/' + subscriberId + '/json')
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Müşderi tapylmady');
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                document.getElementById('subscriber-address').textContent = data.address || '-';
+                document.getElementById('subscriber-phone').textContent = data.phones.join(', ') || '-';
+                document.getElementById('selected-client-type').textContent =
+                    data.client_type === 'legal' ? 'Ýuridiķ şahs' : 'Fiziki şahs';
+                infoDiv.style.display = 'block';
+                infoDiv.style.background = '#e8f4e8';
+                infoDiv.style.borderColor = '#4CAF50';
+                subscriberValid = true;
+                document.getElementById('subscriber-valid').value = 'true';
+            })
+            .catch(function (error) {
+                document.getElementById('subscriber-address').textContent = '-';
+                document.getElementById('subscriber-phone').textContent = '-';
+                document.getElementById('selected-client-type').textContent = 'Müşderi tapylmady!';
+                infoDiv.style.display = 'block';
+                infoDiv.style.background = '#ffe0e0';
+                infoDiv.style.borderColor = '#f44336';
+                subscriberValid = false;
+                document.getElementById('subscriber-valid').value = 'false';
+            });
+    }
+
+    function toggleFreeOrder(checkbox) {
+        var paidInput = document.getElementById('paid_amount');
+        var paymentGroup = document.getElementById('payment-group');
+
+        if (checkbox.checked) {
+            previousPaidAmount = paidInput.value;
+            paidInput.value = '0';
+            paidInput.readOnly = true;
+            paymentGroup.style.opacity = '0.5';
+        } else {
+            paidInput.readOnly = false;
+            paidInput.value = previousPaidAmount;
+            paymentGroup.style.opacity = '1';
+        }
+    }
+
+    function toggleCreditSection(checkbox) {
+        var creditSection = document.getElementById('credit-section');
+        if (checkbox.checked) {
+            creditSection.style.display = 'block';
+            document.getElementById('gap_bilen').value = 0;
+            document.getElementById('dine_suw').value = 0;
+            // Optionally disable standard fields here if we want to enforce one or the other
+        } else {
+            creditSection.style.display = 'none';
+            document.getElementById('gap_bilen').value = 0;
+            document.getElementById('dine_suw').value = 0;
+        }
+    }
+
+    function validateOrderForm() {
+        if (document.getElementById('subscriber-valid').value !== 'true') {
+            alert('Dogry müşderi ID-sini giriziň!');
+            return false;
+        }
+        return true;
+    }
+</script>
+{% endblock %}

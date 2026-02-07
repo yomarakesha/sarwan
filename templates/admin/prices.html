@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Bahalar - Suw CRM{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Bahalar</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.update_prices') }}">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Amal görnüşi</th>
+                            <th>Ýuridik baha (TMT)</th>
+                            <th>Fiziki baha (TMT)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in prices %}
+                        <tr>
+                            <td>
+                                {% if p.operation_type == 'new_bottle' %}
+                                <strong>Täze çüýşe</strong> (20L)
+                                {% elif p.operation_type == 'exchange' %}
+                                <strong>Çalyşyk</strong>
+                                {% elif p.operation_type == 'water_only' %}
+                                <strong>Diňe suw</strong>
+                                {% else %}
+                                {{ p.operation_type }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <input type="number" name="legal_{{ p.id }}" class="form-control"
+                                    value="{{ p.legal_price }}" step="0.01" min="0" style="max-width: 150px;">
+                            </td>
+                            <td>
+                                <input type="number" name="individual_{{ p.id }}" class="form-control"
+                                    value="{{ p.individual_price }}" step="0.01" min="0" style="max-width: 150px;">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn-primary">Ýatda sakla</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

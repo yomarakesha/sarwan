@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Müşderiler - Sarwan{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Müşderiler</h3>
+        <button class="btn btn-primary" onclick="openModal('create-subscriber-modal')">+ Täze müşderi</button>
+    </div>
+    <div class="card-body">
+        <!-- Search/Filter -->
+        <form class="filters" method="GET">
+            <input type="text" name="search" class="form-control" placeholder="Gözleg..." value="{{ search }}">
+            <select name="type" class="form-control">
+                <option value="phone" {% if search_type=='phone' %}selected{% endif %}>Telefon boýunça</option>
+                <option value="name" {% if search_type=='name' %}selected{% endif %}>Ady boýunça</option>
+                <option value="address" {% if search_type=='address' %}selected{% endif %}>Salgy boýunça</option>
+                <option value="all" {% if search_type=='all' %}selected{% endif %}>Hemmesi</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Gözle</button>
+            <a href="{{ url_for('subscribers.index') }}" class="btn">Arassala</a>
+        </form>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Ady</th>
+                        <th>Görnüşi</th>
+                        <th>Telefon</th>
+                        <th>Salgy</th>
+                        <th>Kredit</th>
+                        <th>Amallar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in subscribers %}
+                    <tr>
+                        <td>{{ s.id }}</td>
+                        <td>{{ s.full_name }}</td>
+                        <td>
+                            <span
+                                class="badge {% if s.client_type == 'legal' %}badge-legal{% else %}badge-individual{% endif %}">
+                                {{ 'Ýuridik' if s.client_type == 'legal' else 'Fiziki' }}
+                            </span>
+                        </td>
+                        <td>{{ s.phones|join(', ', attribute='number') or '-' }}</td>
+                        <td>{{ s.address or '-' }}</td>
+                        <td>
+                            <span class="{% if s.debt > 0 %}badge badge-debt{% else %}badge badge-paid{% endif %}">
+                                {{ s.debt|round(2) }} TMT
+                            </span>
+                        </td>
+                        <td class="actions">
+                            <button class="btn btn-sm btn-primary" data-id="{{ s.id }}" data-name="{{ s.full_name }}"
+                                data-type="{{ s.client_type }}"
+                                data-phones="{{ s.phones|map(attribute='number')|join(', ') }}"
+                                data-address="{{ s.address or '' }}"
+                                onclick="editSubscriber(this.dataset.id, this.dataset.name, this.dataset.type, this.dataset.phones, this.dataset.address)">Üýtget</button>
+                            <button class="btn btn-sm btn-success" data-id="{{ s.id }}" data-name="{{ s.full_name }}"
+                                data-debt="{{ s.debt }}"
+                                onclick="openPaymentModal(this.dataset.id, this.dataset.name, this.dataset.debt)">Töleg</button>
+                            <form method="POST" action="{{ url_for('subscribers.delete', id=s.id) }}"
+                                style="display:inline;" onsubmit="return confirmDelete(this)">
+                                <button type="submit" class="btn btn-sm btn-danger">Öçür</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">Müşderi tapylmady</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create Subscriber Modal -->
+<div class="modal-overlay" id="create-subscriber-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h4>Täze müşderi</h4>
+            <button class="modal-close" onclick="closeModal('create-subscriber-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('subscribers.create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Doly ady</label>
+                    <input type="text" name="full_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Görnüşi</label>
+                    <select name="client_type" class="form-control" required>
+                        <option value="individual">Fiziki şahs</option>
+                        <option value="legal">Ýuridik şahs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Salgy</label>
+                    <input type="text" name="address" class="form-control" placeholder="Salgy">
+                </div>
+                <div class="form-group">
+                    <label>Telefon belgileri</label>
+                    <div class="phone-inputs" id="phone-inputs">
+                        <div class="phone-row">
+                            <input type="text" name="phones[]" class="form-control" placeholder="Telefon belgisi">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm mt-2" onclick="addPhoneInput()">+ Telefon goş</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('create-subscriber-modal')">Ýatyr</button>
+                <button type="submit" class="btn btn-primary">Döret</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Subscriber Modal -->
+<div class="modal-overlay" id="edit-subscriber-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h4>Müşderini üýtget</h4>
+            <button class="modal-close" onclick="closeModal('edit-subscriber-modal')">&times;</button>
+        </div>
+        <form method="POST" id="edit-subscriber-form">
+            <input type="hidden" id="edit-subscriber-id" name="id">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Doly ady</label>
+                    <input type="text" id="edit-full-name" name="full_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Görnüşi</label>
+                    <select id="edit-client-type" name="client_type" class="form-control" required>
+                        <option value="individual">Fiziki şahs</option>
+                        <option value="legal">Ýuridik şahs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Salgy</label>
+                    <input type="text" id="edit-address" name="address" class="form-control" placeholder="Salgy">
+                </div>
+                <div class="form-group">
+                    <label>Telefon belgileri</label>
+                    <div class="phone-inputs" id="edit-phone-inputs"></div>
+                    <button type="button" class="btn btn-sm mt-2" onclick="addEditPhoneInput()">+ Telefon goş</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('edit-subscriber-modal')">Ýatyr</button>
+                <button type="submit" class="btn btn-primary">Ýatda sakla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="payment-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h4>Töleg goş</h4>
+            <button class="modal-close" onclick="closeModal('payment-modal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('orders.add_payment') }}">
+            <input type="hidden" id="payment-subscriber-id" name="subscriber_id">
+            <div class="modal-body">
+                <p><strong>Müşderi:</strong> <span id="payment-subscriber-name"></span></p>
+                <p><strong>Häzirki bergisi:</strong> <span id="payment-current-debt"></span></p>
+                <div class="form-group mt-2">
+                    <label>Töleg mukdary (TMT)</label>
+                    <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('payment-modal')">Ýatyr</button>
+                <button type="submit" class="btn btn-success">Töleg goş</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    function editSubscriber(id, name, type, phones, address) {
+        document.getElementById('edit-subscriber-id').value = id;
+        document.getElementById('edit-full-name').value = name;
+        document.getElementById('edit-client-type').value = type;
+        document.getElementById('edit-address').value = address || '';
+        document.getElementById('edit-subscriber-form').action = '/subscribers/' + id + '/edit';
+
+        var phoneInputs = document.getElementById('edit-phone-inputs');
+        phoneInputs.innerHTML = '';
+
+        var phoneList = phones ? phones.split(', ') : [];
+        if (phoneList.length === 0 || (phoneList.length === 1 && phoneList[0] === '')) {
+            phoneList = [''];
+        }
+
+        phoneList.forEach(function (phone) {
+            var div = document.createElement('div');
+            div.className = 'phone-row';
+            div.innerHTML = '<input type="text" name="phones[]" class="form-control" value="' + phone + '">';
+            phoneInputs.appendChild(div);
+        });
+
+        openModal('edit-subscriber-modal');
+    }
+
+    function openPaymentModal(id, name, credit) {
+        document.getElementById('payment-subscriber-id').value = id;
+        document.getElementById('payment-subscriber-name').textContent = name;
+        document.getElementById('payment-current-debt').textContent = credit + ' TMT';
+        openModal('payment-modal');
+    }
+</script>
+{% endblock %}
+{% endblock %}
