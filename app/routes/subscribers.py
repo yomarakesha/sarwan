@@ -15,16 +15,13 @@ def index():
     query = Subscriber.query
     
     if search:
-        if search_type == 'name':
-            query = query.filter(Subscriber.full_name.ilike(f'%{search}%'))
-        elif search_type == 'phone':
+        if search_type == 'phone':
             query = query.join(Phone).filter(Phone.number.ilike(f'%{search}%'))
         elif search_type == 'address':
             query = query.filter(Subscriber.address.ilike(f'%{search}%'))
         else:
             query = query.outerjoin(Phone).filter(
                 db.or_(
-                    Subscriber.full_name.ilike(f'%{search}%'),
                     Phone.number.ilike(f'%{search}%'),
                     Subscriber.address.ilike(f'%{search}%')
                 )
@@ -38,10 +35,13 @@ def index():
         total_orders = db.session.query(db.func.sum(Order.total_amount)).filter(
             Order.subscriber_id == s.id
         ).scalar() or 0
-        total_paid = db.session.query(db.func.sum(Order.paid_amount)).filter(
+        total_order_paid = db.session.query(db.func.sum(Order.paid_amount)).filter(
             Order.subscriber_id == s.id
         ).scalar() or 0
-        subscriber_credits[s.id] = float(total_orders) - float(total_paid)
+        total_direct_paid = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.subscriber_id == s.id
+        ).scalar() or 0
+        subscriber_credits[s.id] = float(total_orders) - (float(total_order_paid) + float(total_direct_paid))
     
     return render_template('subscribers.html', subscribers=subscribers, search=search, 
                           search_type=search_type, subscriber_credits=subscriber_credits)
@@ -49,12 +49,24 @@ def index():
 @subscribers_bp.route('/create', methods=['POST'])
 @login_required
 def create():
-    full_name = request.form.get('full_name')
     client_type = request.form.get('client_type')
-    address = request.form.get('address', '')
+    address = request.form.get('address')
     phones = request.form.getlist('phones[]')
     
-    subscriber = Subscriber(full_name=full_name, client_type=client_type, address=address)
+    subscriber = Subscriber(
+        client_type=client_type,
+        address=address
+    )
+    
+    # Promo Fields
+    promo_start = request.form.get('promo_start_date')
+    if promo_start:
+        try:
+            from datetime import datetime
+            subscriber.promo_start_date = datetime.strptime(promo_start, '%Y-%m-%d')
+        except ValueError:
+            pass # Ignore invalid date
+            
     db.session.add(subscriber)
     db.session.flush()
     
@@ -64,7 +76,10 @@ def create():
             db.session.add(p)
     
     db.session.commit()
-    log_action('CREATE', 'subscriber', subscriber.id, {'full_name': full_name, 'client_type': client_type})
+    log_action('CREATE', 'subscriber', subscriber.id, {
+        'client_type': client_type,
+        'address': address
+    })
     flash('Müşderi döredildi', 'success')
     return redirect(url_for('subscribers.index'))
 
@@ -72,10 +87,21 @@ def create():
 @login_required
 def edit(id):
     subscriber = Subscriber.query.get_or_404(id)
-    subscriber.full_name = request.form.get('full_name')
+    
     subscriber.client_type = request.form.get('client_type')
     subscriber.address = request.form.get('address', '')
     
+    # Promo Fields Update
+    promo_start = request.form.get('promo_start_date')
+    if promo_start:
+        try:
+            from datetime import datetime
+            subscriber.promo_start_date = datetime.strptime(promo_start, '%Y-%m-%d')
+        except ValueError:
+            pass
+    else:
+        subscriber.promo_start_date = None # Clear if empty
+        
     # Update phones
     Phone.query.filter_by(subscriber_id=id).delete()
     phones = request.form.getlist('phones[]')
@@ -85,7 +111,7 @@ def edit(id):
             db.session.add(p)
     
     db.session.commit()
-    log_action('UPDATE', 'subscriber', id, {'full_name': subscriber.full_name})
+    log_action('UPDATE', 'subscriber', id, {'updated': 'details'}) # Removed full_name ref
     flash('Müşderi täzelendi', 'success')
     return redirect(url_for('subscribers.index'))
 
@@ -93,7 +119,6 @@ def edit(id):
 @login_required
 def delete(id):
     subscriber = Subscriber.query.get_or_404(id)
-    name = subscriber.full_name
     
     # Delete all associated orders first
     orders_deleted = Order.query.filter_by(subscriber_id=id).delete()
@@ -104,7 +129,6 @@ def delete(id):
     db.session.delete(subscriber)
     db.session.commit()
     log_action('DELETE', 'subscriber', id, {
-        'full_name': name,
         'orders_deleted': orders_deleted,
         'payments_deleted': payments_deleted
     })
@@ -115,11 +139,32 @@ def delete(id):
 @login_required
 def get_json(id):
     subscriber = Subscriber.query.get_or_404(id)
+    if not subscriber:
+        return jsonify({'error': 'Not found'}), 404
+    
+    # Check promo status
+    from app.services.pricing import get_promo_water_price
+    from app.models import Settings, Order
+    
+    promo_price = get_promo_water_price(id)
+    is_promo = promo_price is not None
+    
+    # Get limit for display
+    promo_limit_setting = Settings.query.get('promo_water_limit')
+    limit = int(promo_limit_setting.value) if promo_limit_setting else 10
+    
+    order_count = Order.query.filter_by(subscriber_id=id).count()
+
     return jsonify({
         'id': subscriber.id,
-        'full_name': subscriber.full_name,
         'client_type': subscriber.client_type,
-        'address': subscriber.address or '',
+        'address': subscriber.address,
         'debt': float(subscriber.debt),
-        'phones': [p.number for p in subscriber.phones]
+        'phones': [p.number for p in subscriber.phones],
+        'promo': {
+            'is_active': is_promo,
+            'price': float(promo_price) if promo_price else 15.0, # Approximate standard
+            'limit': limit,
+            'count': order_count
+        }
     })

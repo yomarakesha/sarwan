@@ -16,42 +16,61 @@ def seed():
             db.session.add(admin)
             print("Admin: admin / admin123")
         
-        # Create test user
-        if not User.query.filter_by(username='user1').first():
-            user = User(username='user1', role='user')
-            user.set_password('user123')
+        # Create accountant user
+        if not User.query.filter_by(username='accountant').first():
+            acc = User(username='accountant', role='accountant')
+            acc.set_password('acc123')
+            db.session.add(acc)
+            print("Accountant: accountant / acc123")
+        
+        # Create test user (operator)
+        if not User.query.filter_by(username='operator').first():
+            user = User(username='operator', role='user')
+            user.set_password('operator123')
             db.session.add(user)
-            print("User: user1 / user123")
+            print("User: operator / operator123")
         
         # Create prices
         if not Price.query.first():
             prices = [
-                Price(operation_type='new_bottle', legal_price=101, individual_price=105),
-                Price(operation_type='exchange', legal_price=61, individual_price=65),
-                Price(operation_type='water_only', legal_price=11, individual_price=15),
+                Price(operation_type='new_bottle', legal_price=105, individual_price=105),
+                Price(operation_type='exchange', legal_price=50, individual_price=50),
+                Price(operation_type='water_only', legal_price=15, individual_price=15),
+                Price(operation_type='container', legal_price=90, individual_price=90),
             ]
             db.session.add_all(prices)
+            db.session.add_all(prices)
             print("Prices created")
+
+        # Create settings
+        from app.models import Settings
+        if not Settings.query.first():
+            settings = [
+                Settings(key='promo_water_price', value='10', description='Promotional price for water (first 10 orders)'),
+                Settings(key='promo_water_limit', value='10', description='Order count limit for promo price'),
+            ]
+            db.session.add_all(settings)
+            print("Settings created")
         
         db.session.commit()
         
-        # Create mock subscribers
+        # Create mock subscribers (Address, Client Type, Phones)
         if not Subscriber.query.first():
             subscribers_data = [
-                ('Rustem Nuryyew', 'legal', 'Bitarap köçe, jaý 15', ['+99361123456']),
-                ('Serdar Rejepow', 'individual', 'Magtymguly şaýoly, jaý 42', ['+99365987654', '+99362111222']),
-                ('Aýna Myradowa', 'individual', 'Andalyp köçe, jaý 8', ['+99364555666']),
-                ('Türkmennebit', 'legal', 'Galkynyş köçe, bina 3', ['+99312456789']),
-                ('Merjen Ataýewa', 'individual', 'Oguzhan köçe, jaý 77', ['+99363222333']),
-                ('Altyn Asyr', 'legal', 'Täzelikleriň köçe, bina 11', ['+99312111222', '+99312333444']),
-                ('Kerim Orazow', 'individual', 'Garaşsyzlyk şaýoly, jaý 25', ['+99365444555']),
-                ('Daşoguz Suw', 'legal', 'Ruhnama köçe, bina 5', ['+99322123456']),
+                ('legal', 'Bitarap köçe, jaý 15', ['+99361123456']),
+                ('individual', 'Magtymguly şaýoly, jaý 42', ['+99365987654', '+99362111222']),
+                ('individual', 'Andalyp köçe, jaý 8', ['+99364555666']),
+                ('legal', 'Galkynyş köçe, bina 3', ['+99312456789']),
+                ('individual', 'Oguzhan köçe, jaý 77', ['+99363222333']),
+                ('legal', 'Täzelikleriň köçe, bina 11', ['+99312111222', '+99312333444']),
+                ('individual', 'Garaşsyzlyk şaýoly, jaý 25', ['+99365444555']),
+                ('legal', 'Ruhnama köçe, bina 5', ['+99322123456']),
             ]
             
             admin_user = User.query.filter_by(username='admin').first()
             
-            for name, client_type, address, phones in subscribers_data:
-                sub = Subscriber(full_name=name, client_type=client_type, address=address, debt=0)
+            for client_type, address, phones in subscribers_data:
+                sub = Subscriber(client_type=client_type, address=address, debt=0)
                 db.session.add(sub)
                 db.session.flush()
                 
@@ -80,14 +99,18 @@ def seed():
             
             for sub_id, new, exchange, water, free, paid_percent in orders_data:
                 sub = Subscriber.query.get(sub_id)
+                
+                # Manual calc for seed to match new logic
                 if sub.client_type == 'legal':
                     total = (new * prices['new_bottle'].legal_price + 
                             exchange * prices['exchange'].legal_price + 
-                            water * prices['water_only'].legal_price)
+                            water * prices['water_only'].legal_price +
+                            free * prices['container'].legal_price)
                 else:
                     total = (new * prices['new_bottle'].individual_price + 
                             exchange * prices['exchange'].individual_price + 
-                            water * prices['water_only'].individual_price)
+                            water * prices['water_only'].individual_price +
+                            free * prices['container'].individual_price)
                 
                 paid = Decimal(str(float(total) * paid_percent))
                 

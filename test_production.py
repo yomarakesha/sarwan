@@ -81,7 +81,7 @@ class ProductionTest:
         r = self.session.get(f'{BASE_URL}/subscribers/')
         self.check_response("Subscribers page loads", r)
         self.test("Has Kredit column", 'Kredit' in r.text, "Kredit column missing")
-        self.test("Has subscriber data", 'Gurbanguly' in r.text or '<tbody>' in r.text)
+        self.test("Has subscriber data", '<tbody>' in r.text)
         
         # Test search
         r = self.session.get(f'{BASE_URL}/subscribers/?search=Serdar&type=name')
@@ -89,7 +89,6 @@ class ProductionTest:
         
         # Test create subscriber
         r = self.session.post(f'{BASE_URL}/subscribers/create', data={
-            'full_name': 'Test Production User',
             'client_type': 'individual',
             'phones[]': '+99365999999'
         }, allow_redirects=True)
@@ -101,10 +100,16 @@ class ProductionTest:
         self.check_response("Orders page loads", r)
         self.test("Has valid columns", 
                  'Goýup bermek' in r.text and 
-                 'Salwan ýerini çalyşmak' in r.text and 
+                 'Sarwan ýerini çalyşmak' in r.text and 
                  'Täze satyn alan' in r.text, 
                  "Renamed columns missing")
         
+        # Get initial debt
+        initial_debt = 0
+        r_json = self.session.get(f'{BASE_URL}/subscribers/1/json')
+        if r_json.status_code == 200:
+            initial_debt = float(r_json.json().get('debt', 0))
+
         # Test order creation with Credit fields (Gap bilen / Diňe suw)
         # Gap bilen (1) * 105 + Diňe suw (2) * 15 = 105 + 30 = 135 TMT
         r = self.session.post(f'{BASE_URL}/orders/create', data={
@@ -118,8 +123,8 @@ class ProductionTest:
         # Verify debt increased
         r_json = self.session.get(f'{BASE_URL}/subscribers/1/json')
         if r_json.status_code == 200:
-            debt = r_json.json().get('debt', 0)
-            self.test("Debt increased after credit order", float(debt) > 0)
+            new_debt = float(r_json.json().get('debt', 0))
+            self.test(f"Debt increased after credit order ({initial_debt} -> {new_debt})", new_debt > initial_debt)
 
         # Test Free Order (Mugt)
         r = self.session.post(f'{BASE_URL}/orders/create', data={

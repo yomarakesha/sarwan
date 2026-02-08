@@ -14,7 +14,6 @@
             <input type="text" name="search" class="form-control" placeholder="Gözleg..." value="{{ search }}">
             <select name="type" class="form-control">
                 <option value="phone" {% if search_type=='phone' %}selected{% endif %}>Telefon boýunça</option>
-                <option value="name" {% if search_type=='name' %}selected{% endif %}>Ady boýunça</option>
                 <option value="address" {% if search_type=='address' %}selected{% endif %}>Salgy boýunça</option>
                 <option value="all" {% if search_type=='all' %}selected{% endif %}>Hemmesi</option>
             </select>
@@ -28,7 +27,6 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Ady</th>
                         <th>Görnüşi</th>
                         <th>Telefon</th>
                         <th>Salgy</th>
@@ -40,11 +38,10 @@
                     {% for s in subscribers %}
                     <tr>
                         <td>{{ s.id }}</td>
-                        <td>{{ s.full_name }}</td>
                         <td>
                             <span
                                 class="badge {% if s.client_type == 'legal' %}badge-legal{% else %}badge-individual{% endif %}">
-                                {{ 'Ýuridik' if s.client_type == 'legal' else 'Fiziki' }}
+                                {{ 'Magazinlar' if s.client_type == 'legal' else 'Rayat' }}
                             </span>
                         </td>
                         <td>{{ s.phones|join(', ', attribute='number') or '-' }}</td>
@@ -55,14 +52,15 @@
                             </span>
                         </td>
                         <td class="actions">
-                            <button class="btn btn-sm btn-primary" data-id="{{ s.id }}" data-name="{{ s.full_name }}"
-                                data-type="{{ s.client_type }}"
+                            <button class="btn btn-sm btn-primary" data-id="{{ s.id }}" data-type="{{ s.client_type }}"
                                 data-phones="{{ s.phones|map(attribute='number')|join(', ') }}"
                                 data-address="{{ s.address or '' }}"
-                                onclick="editSubscriber(this.dataset.id, this.dataset.name, this.dataset.type, this.dataset.phones, this.dataset.address)">Üýtget</button>
-                            <button class="btn btn-sm btn-success" data-id="{{ s.id }}" data-name="{{ s.full_name }}"
-                                data-debt="{{ s.debt }}"
-                                onclick="openPaymentModal(this.dataset.id, this.dataset.name, this.dataset.debt)">Töleg</button>
+                                data-promostart="{{ s.promo_start_date.strftime('%Y-%m-%d') if s.promo_start_date else '' }}"
+                                onclick="editSubscriber(this.dataset.id, this.dataset.type, this.dataset.phones, this.dataset.address, this.dataset.promostart)">Üýtget</button>
+                            {% if current_user.role in ['admin', 'accountant'] %}
+                            <button class="btn btn-sm btn-success" data-id="{{ s.id }}" data-debt="{{ s.debt }}"
+                                onclick="openPaymentModal(this.dataset.id, this.dataset.debt)">Töleg</button>
+                            {% endif %}
                             <form method="POST" action="{{ url_for('subscribers.delete', id=s.id) }}"
                                 style="display:inline;" onsubmit="return confirmDelete(this)">
                                 <button type="submit" class="btn btn-sm btn-danger">Öçür</button>
@@ -90,14 +88,10 @@
         <form method="POST" action="{{ url_for('subscribers.create') }}">
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Doly ady</label>
-                    <input type="text" name="full_name" class="form-control" required>
-                </div>
-                <div class="form-group">
                     <label>Görnüşi</label>
                     <select name="client_type" class="form-control" required>
-                        <option value="individual">Fiziki şahs</option>
-                        <option value="legal">Ýuridik şahs</option>
+                        <option value="individual">Rayat</option>
+                        <option value="legal">Magazinlar</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -112,6 +106,18 @@
                         </div>
                     </div>
                     <button type="button" class="btn btn-sm mt-2" onclick="addPhoneInput()">+ Telefon goş</button>
+                </div>
+
+                <hr>
+                <h5>Aksiýa Sazlamalary (VIP)</h5>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Aksiýa Başlan Senesi</label>
+                            <input type="date" name="promo_start_date" class="form-control">
+                            <small class="text-muted">Şu seneden soňky sargytlar sanalar</small>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -133,14 +139,10 @@
             <input type="hidden" id="edit-subscriber-id" name="id">
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Doly ady</label>
-                    <input type="text" id="edit-full-name" name="full_name" class="form-control" required>
-                </div>
-                <div class="form-group">
                     <label>Görnüşi</label>
                     <select id="edit-client-type" name="client_type" class="form-control" required>
-                        <option value="individual">Fiziki şahs</option>
-                        <option value="legal">Ýuridik şahs</option>
+                        <option value="individual">Rayat</option>
+                        <option value="legal">Magazinlar</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -151,6 +153,18 @@
                     <label>Telefon belgileri</label>
                     <div class="phone-inputs" id="edit-phone-inputs"></div>
                     <button type="button" class="btn btn-sm mt-2" onclick="addEditPhoneInput()">+ Telefon goş</button>
+                </div>
+
+                <hr>
+                <h5>Aksiýa Sazlamalary (VIP)</h5>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Aksiýa Başlan Senesi</label>
+                            <input type="date" id="edit-promo-start" name="promo_start_date" class="form-control">
+                            <small class="text-muted">Şu seneden soňky sargytlar sanalar</small>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -188,11 +202,11 @@
 
 {% block scripts %}
 <script>
-    function editSubscriber(id, name, type, phones, address) {
+    function editSubscriber(id, type, phones, address, promoStart) {
         document.getElementById('edit-subscriber-id').value = id;
-        document.getElementById('edit-full-name').value = name;
         document.getElementById('edit-client-type').value = type;
         document.getElementById('edit-address').value = address || '';
+        document.getElementById('edit-promo-start').value = promoStart || '';
         document.getElementById('edit-subscriber-form').action = '/subscribers/' + id + '/edit';
 
         var phoneInputs = document.getElementById('edit-phone-inputs');
@@ -213,9 +227,9 @@
         openModal('edit-subscriber-modal');
     }
 
-    function openPaymentModal(id, name, credit) {
+    function openPaymentModal(id, credit) {
         document.getElementById('payment-subscriber-id').value = id;
-        document.getElementById('payment-subscriber-name').textContent = name;
+        document.getElementById('payment-subscriber-name').textContent = 'ID: ' + id;
         document.getElementById('payment-current-debt').textContent = credit + ' TMT';
         openModal('payment-modal');
     }

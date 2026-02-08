@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Sazlamalar - Suw CRM{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Sazlamalar</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.update_settings') }}">
+
+            <div class="form-group mb-4">
+                <h4>Aksiýa (Ilkinji sargytlar)</h4>
+                <p class="text-muted">Täze müşderiler üçin arzanladyş şertleri.</p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Aksiýa bahasy (Diňe suw üçin)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="promo_water_price" class="form-control"
+                                    value="{{ settings.get('promo_water_price').value if settings.get('promo_water_price') else '10.00' }}">
+                                <span class="input-group-text">TMT</span>
+                            </div>
+                            <small class="text-muted">Aksiýa döwründe ulanylýan baha</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Aksiýany işjeňleşdir</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <label class="switch">
+                                    <input type="checkbox" name="promo_active" {% if not settings.get('promo_active') or
+                                        settings.get('promo_active').value=='true' %}checked{% endif %}>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>Aksiýany ýak/öçür</span>
+                            </div>
+                            <small class="text-muted">Aksiýa diňe "işjeň" bolanda elýeterli bolar.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <label>Sargyt limiti</label>
+                        <div class="input-group">
+                            <input type="number" name="promo_water_limit" class="form-control"
+                                value="{{ settings.get('promo_water_limit').value if settings.get('promo_water_limit') else 10 }}"
+                                step="1" required>
+                            <span class="input-group-text">sany</span>
+                        </div>
+                        <small class="form-text text-muted">Näçe sargytda aksiýa hereket edýär</small>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Ýatda sakla</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

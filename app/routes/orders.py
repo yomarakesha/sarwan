@@ -5,25 +5,60 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Order, Subscriber, Price, Payment
 from app.services import log_action
+from app.services.pricing import get_promo_water_price
 
 orders_bp = Blueprint('orders', __name__)
 
-def calculate_order_total(subscriber, new_bottles, exchange_bottles, water_only):
+def calculate_order_total(subscriber, new_bottles, exchange_bottles, water_only, free_bottles):
     """Calculate total based on client type and prices"""
     prices = {p.operation_type: p for p in Price.query.all()}
     
-    if subscriber.client_type == 'legal':
-        new_price = prices.get('new_bottle', Price(legal_price=101)).legal_price
-        exchange_price = prices.get('exchange', Price(legal_price=61)).legal_price
-        water_price = prices.get('water_only', Price(legal_price=11)).legal_price
-    else:
-        new_price = prices.get('new_bottle', Price(individual_price=105)).individual_price
-        exchange_price = prices.get('exchange', Price(individual_price=65)).individual_price
-        water_price = prices.get('water_only', Price(individual_price=15)).individual_price
+    # Defaults based on new requirements:
+    # Water: 15
+    # Container: 90
+    # New Bottle (Water+Container): 105
+    # Exchange: 50
+    # "Goýup bermek" -> Container Only: 90
     
+    if subscriber.client_type == 'legal':
+        # Magazinlar prices (Adjust if legal prices differ, for now using same or existing logic if present)
+        # Using existing pattern but updating defaults if missing
+        new_price = prices.get('new_bottle', Price(legal_price=105)).legal_price
+        exchange_price = prices.get('exchange', Price(legal_price=50)).legal_price
+        water_price = prices.get('water_only', Price(legal_price=15)).legal_price
+        container_price = prices.get('container', Price(legal_price=90)).legal_price
+    else:
+        # Rayat prices
+        new_price = prices.get('new_bottle', Price(individual_price=105)).individual_price
+        exchange_price = prices.get('exchange', Price(individual_price=50)).individual_price
+        water_price = prices.get('water_only', Price(individual_price=15)).individual_price
+        container_price = prices.get('container', Price(individual_price=90)).individual_price
+    
+    # Check for promo price for water_only
+    # Check for promo price for water_only and others
+    promo_price = get_promo_water_price(subscriber.id)
+    if promo_price is not None:
+        # Calculate discount delta (Standard - Promo)
+        # Assuming Standard is the price we just fetched for water_only? 
+        # Actually, water_price above is the specific price for this client type (15 or 11).
+        # PROMO is fixed at 10.
+        # If Client Type is legal (11 TMT), promo (10) is 1 TMT off.
+        # If Client Type is individual (15 TMT), promo (10) is 5 TMT off.
+        
+        # Apply promo directly to water_only
+        delta = water_price - promo_price
+        
+        # Apply same delta to other water-containing products
+        # Ensure we don't go below 0 or break logic if delta is negative (unlikely unless promo > standard)
+        if delta > 0:
+            water_price = promo_price # Set water to promo
+            new_price = new_price - delta
+            exchange_price = exchange_price - delta
+
     total = (Decimal(new_bottles) * new_price + 
              Decimal(exchange_bottles) * exchange_price + 
-             Decimal(water_only) * water_price)
+             Decimal(water_only) * water_price +
+             Decimal(free_bottles) * container_price)
     return total
 
 def recalculate_debt(subscriber):
@@ -32,11 +67,15 @@ def recalculate_debt(subscriber):
         Order.subscriber_id == subscriber.id
     ).scalar() or 0
     
-    total_payments = db.session.query(db.func.sum(Payment.amount)).filter(
+    total_order_payments = db.session.query(db.func.sum(Order.paid_amount)).filter(
+        Order.subscriber_id == subscriber.id
+    ).scalar() or 0
+    
+    total_direct_payments = db.session.query(db.func.sum(Payment.amount)).filter(
         Payment.subscriber_id == subscriber.id
     ).scalar() or 0
     
-    subscriber.debt = Decimal(total_orders) - Decimal(total_payments)
+    subscriber.debt = Decimal(total_orders) - (Decimal(total_order_payments) + Decimal(total_direct_payments))
     db.session.commit()
 
 @orders_bp.route('/')
@@ -68,7 +107,7 @@ def index():
         query = query.filter(Order.created_at <= datetime.strptime(date_to + ' 23:59:59', '%Y-%m-%d %H:%M:%S'))
     
     orders = query.order_by(Order.id.desc()).all()
-    subscribers = Subscriber.query.order_by(Subscriber.full_name).all()
+    subscribers = Subscriber.query.order_by(Subscriber.id.desc()).all()
     prices = {p.operation_type: p for p in Price.query.all()}
     
     # Calculate total bottles for each subscriber
@@ -112,8 +151,30 @@ def create():
     # (Check if standard fields are 0 to be safe, or just prioritize Credit?)
     # Let's check if credit fields are used
     if gap_bilen > 0 or dine_suw > 0:
-        # Credit Mode: Prices 105/15, Payment is 0 unless Mugt
-        total = Decimal(gap_bilen * 105 + dine_suw * 15)
+        # Credit Mode: Prices 105/15 (or promo)
+        
+        # Determine water price (15 or 10)
+        water_price = Decimal('15.00')
+        promo_price = get_promo_water_price(subscriber.id)
+        if promo_price is not None:
+            water_price = promo_price
+            # Also apply discount to New Bottle (Gap bilen)
+            # Standard Gap Bilen is 105. 
+            # If promo applies (10 vs 15), delta is 5.
+            # So Gap Bilen becomes 100.
+            # But wait, credit mode logic below calculates total manually:
+            # total = Decimal(gap_bilen * 105 + dine_suw * water_price)
+            # We need to adjust the 105 constant too if promo active.
+            pass # Logic handled below
+            
+        # Calculate totals with potential promo
+        gap_bilen_price = Decimal('105.00')
+        if promo_price is not None:
+             # Apply 5 TMT discount to new bottle too (105 -> 100)
+             # Assumption: Standard water is 15. Promo is 10. Delta 5.
+             gap_bilen_price = Decimal('100.00')
+             
+        total = Decimal(gap_bilen) * gap_bilen_price + Decimal(dine_suw) * water_price
         # Map credit fields to db fields
         # gap_bilen -> new_bottles (assuming buying bottle)
         # dine_suw -> exchange_bottles (assuming just water)
@@ -140,7 +201,7 @@ def create():
         
     else:
         # Standard Mode
-        total = calculate_order_total(subscriber, new_bottles, exchange_bottles, water_only)
+        total = calculate_order_total(subscriber, new_bottles, exchange_bottles, water_only, free_bottles)
         
         # If paid_amount not specified, assume full payment
         if paid_amount is None:
@@ -199,6 +260,10 @@ def add_payment():
     subscriber_id = request.form.get('subscriber_id', type=int)
     amount = request.form.get('amount', type=float)
     
+    if current_user.role not in ['admin', 'accountant']:
+        flash('Diňe hasapçy töleg kabul edip bilýär!', 'danger')
+        return redirect(url_for('subscribers.index'))
+
     payment = Payment(
         subscriber_id=subscriber_id,
         user_id=current_user.id,

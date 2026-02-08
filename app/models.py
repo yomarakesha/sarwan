@@ -27,11 +27,14 @@ class User(UserMixin, db.Model):
 class Subscriber(db.Model):
     __tablename__ = 'subscribers'
     id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(128), nullable=False)
-    client_type = db.Column(db.String(20), nullable=False)  # legal or individual
+    client_type = db.Column(db.String(20), nullable=False)  # Magazinlar (legal) or Rayat (individual)
     address = db.Column(db.String(256), nullable=True)  # Subscriber address
     debt = db.Column(db.Numeric(12, 2), default=0)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Promo Control
+    promo_start_date = db.Column(db.DateTime, nullable=True) # If set, only count orders after this date
+    promo_custom_limit = db.Column(db.Integer, nullable=True) # If set, override global limit
     
     phones = db.relationship('Phone', backref='subscriber', lazy='dynamic', cascade='all, delete-orphan')
     orders = db.relationship('Order', backref='subscriber', lazy='dynamic')
@@ -81,3 +84,9 @@ class ActionLog(db.Model):
     entity_id = db.Column(db.Integer)
     details = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Settings(db.Model):
+    __tablename__ = 'settings'
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.String(256))
+    description = db.Column(db.String(256))

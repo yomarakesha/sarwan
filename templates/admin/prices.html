@@ -14,8 +14,8 @@
                     <thead>
                         <tr>
                             <th>Amal görnüşi</th>
-                            <th>Ýuridik baha (TMT)</th>
-                            <th>Fiziki baha (TMT)</th>
+                            <th>Magazin baha (TMT)</th>
+                            <th>Rayat baha (TMT)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -28,6 +28,8 @@
                                 <strong>Çalyşyk</strong>
                                 {% elif p.operation_type == 'water_only' %}
                                 <strong>Diňe suw</strong>
+                                {% elif p.operation_type == 'container' %}
+                                <strong>Tara</strong>
                                 {% else %}
                                 {{ p.operation_type }}
                                 {% endif %}

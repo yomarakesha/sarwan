@@ -33,7 +33,7 @@
                         <th>Salgy</th>
                         <th>Täze çüýşe</th>
                         <th>Täze satyn alan we beýleki gap</th>
-                        <th>Salwan ýerini çalyşmak</th>
+                        <th>Sarwan ýerini çalyşmak</th>
                         <th>Goýup bermek</th>
                         <th>Jemi</th>
                         <th>Sene</th>
@@ -94,6 +94,12 @@
                         <p><strong>Salgy:</strong> <span id="subscriber-address">-</span></p>
                         <p><strong>Telefon:</strong> <span id="subscriber-phone">-</span></p>
                         <p><strong>Görnüşi:</strong> <span id="selected-client-type">-</span></p>
+                        <div id="promo-badge"
+                            style="display: none; margin-top: 10px; background: #dff0d8; color: #3c763d; padding: 10px; border-radius: 4px; text-align: center; border: 1px solid #d6e9c6;">
+                            <strong>🎉 AKSIÝA MÖWJÜT!</strong><br>
+                            <span id="promo-details">Suw 10 TMT (Galan: <span id="promo-remaining"></span>
+                                sargyt)</span>
+                        </div>
                     </div>
                 </div>
 
@@ -108,7 +114,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Salwan ýerini çalyşmak (sany)</label>
+                    <label>Sarwan ýerini çalyşmak (sany)</label>
                     <input type="number" name="water_only" class="form-control" value="0" min="0">
                 </div>
 
@@ -117,11 +123,13 @@
                     <input type="number" name="free_bottles" class="form-control" value="0" min="0">
                 </div>
 
+                {% if current_user.role in ['admin', 'accountant'] %}
                 <div class="form-group" id="payment-group">
                     <label>Tölenen mukdar (TMT)</label>
                     <input type="number" name="paid_amount" id="paid_amount" class="form-control" step="0.01" min="0"
                         placeholder="Boş bolsa, doly töleg hasaplanýar">
                 </div>
+                {% endif %}
 
                 <hr style="border-color: #444; margin: 15px 0;">
 
@@ -189,7 +197,18 @@
                 document.getElementById('subscriber-address').textContent = data.address || '-';
                 document.getElementById('subscriber-phone').textContent = data.phones.join(', ') || '-';
                 document.getElementById('selected-client-type').textContent =
-                    data.client_type === 'legal' ? 'Ýuridiķ şahs' : 'Fiziki şahs';
+                    data.client_type === 'legal' ? 'Magazinlar' : 'Rayat';
+
+                // Promo Logic
+                var promoDiv = document.getElementById('promo-badge');
+                if (data.promo && data.promo.is_active) {
+                    promoDiv.style.display = 'block';
+                    var remaining = data.promo.limit - data.promo.count;
+                    document.getElementById('promo-remaining').textContent = remaining;
+                } else {
+                    promoDiv.style.display = 'none';
+                }
+
                 infoDiv.style.display = 'block';
                 infoDiv.style.background = '#e8f4e8';
                 infoDiv.style.borderColor = '#4CAF50';

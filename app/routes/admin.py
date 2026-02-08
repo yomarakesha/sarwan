@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from functools import wraps
 from app import db
-from app.models import User, Price, ActionLog
+from app.models import User, Price, ActionLog, Settings
 from app.services import log_action
 
 admin_bp = Blueprint('admin', __name__)
@@ -120,3 +120,68 @@ def logs():
     page = request.args.get('page', 1, type=int)
     logs = ActionLog.query.order_by(ActionLog.created_at.desc()).paginate(page=page, per_page=50)
     return render_template('admin/logs.html', logs=logs)
+
+@admin_bp.route('/settings')
+@login_required
+@admin_required
+def settings():
+    # Fetch all settings
+    settings_list = Settings.query.all()
+    # Convert list to dict for easier access if needed, or just pass list
+    # Let's pass a dict for easier template access: settings.promo_water_price
+    settings_dict = {s.key: s for s in settings_list}
+    return render_template('admin/settings.html', settings=settings_dict)
+
+@admin_bp.route('/settings/update', methods=['POST'])
+@login_required
+@admin_required
+def update_settings():
+    # Promo Price
+    promo_price = request.form.get('promo_water_price')
+    if promo_price:
+        try:
+            val = float(promo_price)
+            if val < 0: raise ValueError
+            
+            s = Settings.query.get('promo_water_price')
+            if not s:
+                s = Settings(key='promo_water_price', description='Promotional price for water')
+                db.session.add(s)
+            s.value = str(promo_price)
+        except ValueError:
+            flash('Aksiýa bahasy san bolmaly!', 'error')
+            return redirect(url_for('admin.settings'))
+        
+    # Promo Limit
+    promo_limit = request.form.get('promo_water_limit')
+    if promo_limit:
+        try:
+            val = int(promo_limit)
+            if val < 0: raise ValueError
+            
+            s = Settings.query.get('promo_water_limit')
+            if not s:
+                s = Settings(key='promo_water_limit', description='Order count limit for promo')
+                db.session.add(s)
+            s.value = str(promo_limit)
+        except ValueError:
+            flash('Sargyt limiti bitin san bolmaly!', 'error')
+            return redirect(url_for('admin.settings'))
+        s = Settings.query.get('promo_water_limit')
+        if not s:
+            s = Settings(key='promo_water_limit', description='Order count limit for promo price')
+            db.session.add(s)
+        s.value = str(promo_limit)
+        
+    # Promo Active Toggle
+    promo_active = request.form.get('promo_active') # 'on' or None
+    s = Settings.query.get('promo_active')
+    if not s:
+        s = Settings(key='promo_active', description='Global promo activation switch')
+        db.session.add(s)
+    s.value = 'true' if promo_active == 'on' else 'false'
+        
+    db.session.commit()
+    log_action('UPDATE', 'settings', None, {'updated': 'promo_settings'})
+    flash('Sazlamalar täzelendi', 'success')
+    return redirect(url_for('admin.settings'))
