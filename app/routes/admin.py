@@ -136,50 +136,8 @@ def settings():
 @login_required
 @admin_required
 def update_settings():
-    # Promo Price
-    promo_price = request.form.get('promo_water_price')
-    if promo_price:
-        try:
-            val = float(promo_price)
-            if val < 0: raise ValueError
-            
-            s = Settings.query.get('promo_water_price')
-            if not s:
-                s = Settings(key='promo_water_price', description='Promotional price for water')
-                db.session.add(s)
-            s.value = str(promo_price)
-        except ValueError:
-            flash('Aksiýa bahasy san bolmaly!', 'error')
-            return redirect(url_for('admin.settings'))
-        
-    # Promo Limit
-    promo_limit = request.form.get('promo_water_limit')
-    if promo_limit:
-        try:
-            val = int(promo_limit)
-            if val < 0: raise ValueError
-            
-            s = Settings.query.get('promo_water_limit')
-            if not s:
-                s = Settings(key='promo_water_limit', description='Order count limit for promo')
-                db.session.add(s)
-            s.value = str(promo_limit)
-        except ValueError:
-            flash('Sargyt limiti bitin san bolmaly!', 'error')
-            return redirect(url_for('admin.settings'))
-        s = Settings.query.get('promo_water_limit')
-        if not s:
-            s = Settings(key='promo_water_limit', description='Order count limit for promo price')
-            db.session.add(s)
-        s.value = str(promo_limit)
-        
-    # Promo Active Toggle
-    promo_active = request.form.get('promo_active') # 'on' or None
-    s = Settings.query.get('promo_active')
-    if not s:
-        s = Settings(key='promo_active', description='Global promo activation switch')
-        db.session.add(s)
-    s.value = 'true' if promo_active == 'on' else 'false'
+    # Promo settings update logic removed
+
         
     db.session.commit()
     log_action('UPDATE', 'settings', None, {'updated': 'promo_settings'})

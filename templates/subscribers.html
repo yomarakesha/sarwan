@@ -55,8 +55,7 @@
                             <button class="btn btn-sm btn-primary" data-id="{{ s.id }}" data-type="{{ s.client_type }}"
                                 data-phones="{{ s.phones|map(attribute='number')|join(', ') }}"
                                 data-address="{{ s.address or '' }}"
-                                data-promostart="{{ s.promo_start_date.strftime('%Y-%m-%d') if s.promo_start_date else '' }}"
-                                onclick="editSubscriber(this.dataset.id, this.dataset.type, this.dataset.phones, this.dataset.address, this.dataset.promostart)">Üýtget</button>
+                                onclick="editSubscriber(this.dataset.id, this.dataset.type, this.dataset.phones, this.dataset.address)">Üýtget</button>
                             {% if current_user.role in ['admin', 'accountant'] %}
                             <button class="btn btn-sm btn-success" data-id="{{ s.id }}" data-debt="{{ s.debt }}"
                                 onclick="openPaymentModal(this.dataset.id, this.dataset.debt)">Töleg</button>
@@ -108,17 +107,9 @@
                     <button type="button" class="btn btn-sm mt-2" onclick="addPhoneInput()">+ Telefon goş</button>
                 </div>
 
-                <hr>
-                <h5>Aksiýa Sazlamalary (VIP)</h5>
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="form-group">
-                            <label>Aksiýa Başlan Senesi</label>
-                            <input type="date" name="promo_start_date" class="form-control">
-                            <small class="text-muted">Şu seneden soňky sargytlar sanalar</small>
-                        </div>
-                    </div>
-                </div>
+
+                <!-- Promo Settings removed -->
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="closeModal('create-subscriber-modal')">Ýatyr</button>
@@ -155,17 +146,9 @@
                     <button type="button" class="btn btn-sm mt-2" onclick="addEditPhoneInput()">+ Telefon goş</button>
                 </div>
 
-                <hr>
-                <h5>Aksiýa Sazlamalary (VIP)</h5>
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="form-group">
-                            <label>Aksiýa Başlan Senesi</label>
-                            <input type="date" id="edit-promo-start" name="promo_start_date" class="form-control">
-                            <small class="text-muted">Şu seneden soňky sargytlar sanalar</small>
-                        </div>
-                    </div>
-                </div>
+
+                <!-- Promo Settings removed -->
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="closeModal('edit-subscriber-modal')">Ýatyr</button>
@@ -202,11 +185,10 @@
 
 {% block scripts %}
 <script>
-    function editSubscriber(id, type, phones, address, promoStart) {
+    function editSubscriber(id, type, phones, address) {
         document.getElementById('edit-subscriber-id').value = id;
         document.getElementById('edit-client-type').value = type;
         document.getElementById('edit-address').value = address || '';
-        document.getElementById('edit-promo-start').value = promoStart || '';
         document.getElementById('edit-subscriber-form').action = '/subscribers/' + id + '/edit';
 
         var phoneInputs = document.getElementById('edit-phone-inputs');

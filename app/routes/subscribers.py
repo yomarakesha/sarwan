@@ -58,14 +58,9 @@ def create():
         address=address
     )
     
-    # Promo Fields
-    promo_start = request.form.get('promo_start_date')
-    if promo_start:
-        try:
-            from datetime import datetime
-            subscriber.promo_start_date = datetime.strptime(promo_start, '%Y-%m-%d')
-        except ValueError:
-            pass # Ignore invalid date
+    
+    # Promo Fields - REMOVED
+
             
     db.session.add(subscriber)
     db.session.flush()
@@ -91,16 +86,9 @@ def edit(id):
     subscriber.client_type = request.form.get('client_type')
     subscriber.address = request.form.get('address', '')
     
-    # Promo Fields Update
-    promo_start = request.form.get('promo_start_date')
-    if promo_start:
-        try:
-            from datetime import datetime
-            subscriber.promo_start_date = datetime.strptime(promo_start, '%Y-%m-%d')
-        except ValueError:
-            pass
-    else:
-        subscriber.promo_start_date = None # Clear if empty
+    
+    # Promo Fields Update - REMOVED
+
         
     # Update phones
     Phone.query.filter_by(subscriber_id=id).delete()
@@ -111,7 +99,7 @@ def edit(id):
             db.session.add(p)
     
     db.session.commit()
-    log_action('UPDATE', 'subscriber', id, {'updated': 'details'}) # Removed full_name ref
+    log_action('UPDATE', 'subscriber', id, {'updated': 'details'})
     flash('Müşderi täzelendi', 'success')
     return redirect(url_for('subscribers.index'))
 
@@ -139,32 +127,10 @@ def delete(id):
 @login_required
 def get_json(id):
     subscriber = Subscriber.query.get_or_404(id)
-    if not subscriber:
-        return jsonify({'error': 'Not found'}), 404
-    
-    # Check promo status
-    from app.services.pricing import get_promo_water_price
-    from app.models import Settings, Order
-    
-    promo_price = get_promo_water_price(id)
-    is_promo = promo_price is not None
-    
-    # Get limit for display
-    promo_limit_setting = Settings.query.get('promo_water_limit')
-    limit = int(promo_limit_setting.value) if promo_limit_setting else 10
-    
-    order_count = Order.query.filter_by(subscriber_id=id).count()
-
     return jsonify({
         'id': subscriber.id,
         'client_type': subscriber.client_type,
         'address': subscriber.address,
         'debt': float(subscriber.debt),
-        'phones': [p.number for p in subscriber.phones],
-        'promo': {
-            'is_active': is_promo,
-            'price': float(promo_price) if promo_price else 15.0, # Approximate standard
-            'limit': limit,
-            'count': order_count
-        }
+        'phones': [p.number for p in subscriber.phones]
     })

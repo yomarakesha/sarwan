@@ -5,7 +5,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Order, Subscriber, Price, Payment
 from app.services import log_action
-from app.services.pricing import get_promo_water_price
+from app.services import log_action
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -34,26 +34,10 @@ def calculate_order_total(subscriber, new_bottles, exchange_bottles, water_only,
         water_price = prices.get('water_only', Price(individual_price=15)).individual_price
         container_price = prices.get('container', Price(individual_price=90)).individual_price
     
+    
     # Check for promo price for water_only
-    # Check for promo price for water_only and others
-    promo_price = get_promo_water_price(subscriber.id)
-    if promo_price is not None:
-        # Calculate discount delta (Standard - Promo)
-        # Assuming Standard is the price we just fetched for water_only? 
-        # Actually, water_price above is the specific price for this client type (15 or 11).
-        # PROMO is fixed at 10.
-        # If Client Type is legal (11 TMT), promo (10) is 1 TMT off.
-        # If Client Type is individual (15 TMT), promo (10) is 5 TMT off.
-        
-        # Apply promo directly to water_only
-        delta = water_price - promo_price
-        
-        # Apply same delta to other water-containing products
-        # Ensure we don't go below 0 or break logic if delta is negative (unlikely unless promo > standard)
-        if delta > 0:
-            water_price = promo_price # Set water to promo
-            new_price = new_price - delta
-            exchange_price = exchange_price - delta
+    # Promo functionality removed
+    # promo_price = get_promo_water_price(subscriber.id)
 
     total = (Decimal(new_bottles) * new_price + 
              Decimal(exchange_bottles) * exchange_price + 
@@ -93,11 +77,14 @@ def index():
             query = query.filter(Order.id == int(search) if search.isdigit() else -1)
         elif search_type == 'address':
             query = query.filter(Subscriber.address.ilike(f'%{search}%'))
+        elif search_type == 'phone':
+            query = query.join(Subscriber.phones).filter(Phone.number.ilike(f'%{search}%'))
         else:
-            query = query.filter(
+            query = query.outerjoin(Subscriber.phones).filter(
                 db.or_(
                     Subscriber.address.ilike(f'%{search}%'),
-                    Order.id == (int(search) if search.isdigit() else -1)
+                    Order.id == (int(search) if search.isdigit() else -1),
+                    Phone.number.ilike(f'%{search}%')
                 )
             )
     
@@ -153,26 +140,11 @@ def create():
     if gap_bilen > 0 or dine_suw > 0:
         # Credit Mode: Prices 105/15 (or promo)
         
-        # Determine water price (15 or 10)
+        # Determine water price (15)
         water_price = Decimal('15.00')
-        promo_price = get_promo_water_price(subscriber.id)
-        if promo_price is not None:
-            water_price = promo_price
-            # Also apply discount to New Bottle (Gap bilen)
-            # Standard Gap Bilen is 105. 
-            # If promo applies (10 vs 15), delta is 5.
-            # So Gap Bilen becomes 100.
-            # But wait, credit mode logic below calculates total manually:
-            # total = Decimal(gap_bilen * 105 + dine_suw * water_price)
-            # We need to adjust the 105 constant too if promo active.
-            pass # Logic handled below
-            
-        # Calculate totals with potential promo
+
+        # Calculate totals
         gap_bilen_price = Decimal('105.00')
-        if promo_price is not None:
-             # Apply 5 TMT discount to new bottle too (105 -> 100)
-             # Assumption: Standard water is 15. Promo is 10. Delta 5.
-             gap_bilen_price = Decimal('100.00')
              
         total = Decimal(gap_bilen) * gap_bilen_price + Decimal(dine_suw) * water_price
         # Map credit fields to db fields

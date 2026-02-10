@@ -16,6 +16,7 @@
                 <option value="all" {% if search_type=='all' %}selected{% endif %}>Hemmesi</option>
                 <option value="id" {% if search_type=='id' %}selected{% endif %}>ID boýunça</option>
                 <option value="address" {% if search_type=='address' %}selected{% endif %}>Salgy boýunça</option>
+                <option value="phone" {% if search_type=='phone' %}selected{% endif %}>Telefon boýunça</option>
             </select>
             <input type="date" name="date_from" class="form-control" value="{{ date_from }}"
                 placeholder="Başlangyç sene">
@@ -94,12 +95,6 @@
                         <p><strong>Salgy:</strong> <span id="subscriber-address">-</span></p>
                         <p><strong>Telefon:</strong> <span id="subscriber-phone">-</span></p>
                         <p><strong>Görnüşi:</strong> <span id="selected-client-type">-</span></p>
-                        <div id="promo-badge"
-                            style="display: none; margin-top: 10px; background: #dff0d8; color: #3c763d; padding: 10px; border-radius: 4px; text-align: center; border: 1px solid #d6e9c6;">
-                            <strong>🎉 AKSIÝA MÖWJÜT!</strong><br>
-                            <span id="promo-details">Suw 10 TMT (Galan: <span id="promo-remaining"></span>
-                                sargyt)</span>
-                        </div>
                     </div>
                 </div>
 
@@ -198,16 +193,6 @@
                 document.getElementById('subscriber-phone').textContent = data.phones.join(', ') || '-';
                 document.getElementById('selected-client-type').textContent =
                     data.client_type === 'legal' ? 'Magazinlar' : 'Rayat';
-
-                // Promo Logic
-                var promoDiv = document.getElementById('promo-badge');
-                if (data.promo && data.promo.is_active) {
-                    promoDiv.style.display = 'block';
-                    var remaining = data.promo.limit - data.promo.count;
-                    document.getElementById('promo-remaining').textContent = remaining;
-                } else {
-                    promoDiv.style.display = 'none';
-                }
 
                 infoDiv.style.display = 'block';
                 infoDiv.style.background = '#e8f4e8';

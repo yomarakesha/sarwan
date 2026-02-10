@@ -32,9 +32,6 @@ class Subscriber(db.Model):
     debt = db.Column(db.Numeric(12, 2), default=0)
     created_at = db.Column(db.DateTime, default=datetime.now)
     
-    # Promo Control
-    promo_start_date = db.Column(db.DateTime, nullable=True) # If set, only count orders after this date
-    promo_custom_limit = db.Column(db.Integer, nullable=True) # If set, override global limit
     
     phones = db.relationship('Phone', backref='subscriber', lazy='dynamic', cascade='all, delete-orphan')
     orders = db.relationship('Order', backref='subscriber', lazy='dynamic')
